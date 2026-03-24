@@ -1,16 +1,95 @@
-# README
+# ScanSplit
 
-## About
+Десктопное приложение для автоматического разбиения отсканированных учебных работ по студентам. Принимает PDF с несколькими работами, распознаёт имена студентов и группы через OCR и создаёт отдельный PDF-файл для каждого студента.
 
-This is the official Wails Svelte-TS template.
+## Как это работает
 
-## Live Development
+Обработка проходит в 5 этапов:
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+1. **Разбиение** — PDF разбивается на отдельные страницы (pdfcpu)
+2. **Рендеринг** — каждая страница конвертируется в PNG с разрешением 300 DPI (MuPDF)
+3. **OCR** — Tesseract распознаёт русский текст на изображениях (до 4 параллельных воркеров)
+4. **Парсинг** — из текста извлекаются ФИО студента и код группы с помощью регулярных выражений
+5. **Группировка и сборка** — страницы объединяются в PDF-файлы по студентам
 
-## Building
+Алгоритм группировки учитывает нечёткое совпадение имён (склонение: Малышев/Малышева), безымянные страницы перед титульными и страницы без распознанного имени. Нераспознанные страницы сохраняются отдельно для ручной проверки.
 
-To build a redistributable, production mode package, use `wails build`.
+## Технологии
+
+- **Go** — бэкенд и вся логика обработки
+- **Wails v2** — фреймворк для нативного десктопного приложения (WebKit)
+- **Svelte + TypeScript** — интерфейс
+- **Tesseract** (через gosseract) — OCR, русская языковая модель встроена в бинарник
+- **pdfcpu** — разбиение и сборка PDF
+- **go-fitz (MuPDF)** — рендеринг страниц PDF в PNG
+
+## Установка зависимостей
+
+### macOS
+
+```bash
+brew install tesseract leptonica
+go env -w CGO_CXXFLAGS="-I/opt/homebrew/include"
+go env -w CGO_LDFLAGS="-L/opt/homebrew/lib"
+```
+
+### Windows (MSYS2 MinGW64)
+
+```bash
+pacman -S mingw-w64-x86_64-tesseract-ocr mingw-w64-x86_64-leptonica
+```
+
+## Разработка
+
+```bash
+# Скачать русскую языковую модель Tesseract (один раз)
+make tessdata
+
+# Запустить в режиме разработки (горячая перезагрузка)
+make dev
+```
+
+## Сборка
+
+```bash
+# macOS (arm64)
+make build-mac
+make bundle-mac   # упаковать библиотеки Tesseract в приложение
+
+# Windows (amd64)
+make build-win
+make bundle-win   # скопировать нужные DLL рядом с бинарником
+```
+
+Готовое приложение окажется в `build/bin/`.
+
+## Отладка
+
+В репозитории есть CLI-инструмент для диагностики OCR и группировки:
+
+```bash
+go run ./cmd/debug <input.pdf>
+```
+
+Он выводит результаты распознавания и группировки постранично.
+
+## Структура проекта
+
+```
+scan-split/
+├── main.go                  # точка входа, инициализация Wails
+├── Makefile                 # сборка, tessdata, бандлинг
+├── cmd/
+│   ├── app/app.go           # методы, доступные из JS (ProcessFile и др.)
+│   └── debug/main.go        # CLI для отладки
+├── internal/
+│   ├── models/              # общие типы данных
+│   ├── pipeline/            # оркестрация 5-этапного пайплайна
+│   ├── ocr/                 # Tesseract, парсинг имён/групп, mock-режим
+│   └── pdf/                 # разбиение, рендеринг, сборка PDF
+├── frontend/                # Svelte-приложение
+│   └── src/
+│       ├── App.svelte        # главный компонент, управление состоянием
+│       └── lib/             # FileUpload, ProcessingView, ResultsView
+└── third_party/gosseract/   # локальный форк gosseract
+```
