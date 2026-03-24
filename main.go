@@ -33,7 +33,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 18, G: 18, B: 18, A: 1},
 		OnStartup:        a.Startup,
 		OnShutdown:       a.Shutdown,
-		Bind:             []interface{}{a},
+		Bind:             []any{a},
 		// EnableFileDrop activates runtime.OnFileDrop so we get the full native
 		// file path when the user drags a PDF onto the window.
 		// DisableWebViewDrop is intentionally NOT set: the frontend's blockNativeDrop

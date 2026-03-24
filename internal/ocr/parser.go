@@ -36,14 +36,8 @@ var nameStopWords = map[string]bool{
 	"Факультет":      true,
 }
 
-// Parser extracts FullName and Group from OCR text.
-type Parser struct{}
-
-// NewParser creates a new Parser.
-func NewParser() *Parser { return &Parser{} }
-
 // Parse extracts student info from raw OCR text.
-func (p *Parser) Parse(text string) ParseResult {
+func Parse(text string) ParseResult {
 	name := extractName(text)
 	group := groupRe.FindString(text)
 
@@ -71,7 +65,7 @@ var studentPrefixes = []string{"Студент:", "Студентка:", "Сту
 //     Accepts both full 3-word names and abbreviated forms (Фамилия И.О. / Фамилия И. О.).
 //  2. Fallback — three consecutive capitalized Cyrillic words not in the stop-word list.
 func extractName(text string) string {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		for _, prefix := range studentPrefixes {
 			if after, ok := strings.CutPrefix(line, prefix); ok {

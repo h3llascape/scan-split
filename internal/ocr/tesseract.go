@@ -17,15 +17,18 @@ var tessdataFS embed.FS
 // TesseractProvider implements Provider using the local Tesseract OCR engine.
 // The Russian language model (rus.traineddata) is embedded at build time and
 // extracted to the OS user-cache directory on first use — no external files needed.
+// A pool of gosseract clients is created at init (one per concurrency worker),
+// avoiding re-initialisation on every page while keeping calls parallel.
 type TesseractProvider struct {
-	logger      *slog.Logger
-	tessdataDir string // path to the extracted tessdata directory
+	logger *slog.Logger
+	pool   chan *gosseract.Client
 }
 
 // NewTesseractProvider creates a TesseractProvider and extracts the embedded
 // tessdata to os.UserCacheDir()/scansplit/tessdata if not already present.
+// poolSize controls how many Tesseract clients are created (should match pipeline concurrency).
 // Returns an error if tessdata was not embedded at build time (see Makefile: make tessdata).
-func NewTesseractProvider(logger *slog.Logger) (*TesseractProvider, error) {
+func NewTesseractProvider(logger *slog.Logger, poolSize int) (*TesseractProvider, error) {
 	data, err := tessdataFS.ReadFile("tessdata/rus.traineddata")
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -53,32 +56,38 @@ func NewTesseractProvider(logger *slog.Logger) (*TesseractProvider, error) {
 		logger.Debug("tessdata extracted", "path", dest, "bytes", len(data))
 	}
 
-	// Smoke-test: verify tesseract can initialise.
-	client := gosseract.NewClient()
-	client.SetTessdataPrefix(tessdataDir)
-	if err := client.SetLanguage("rus"); err != nil {
-		client.Close()
-		return nil, fmt.Errorf("tesseract init failed (language 'rus'): %w", err)
+	if poolSize <= 0 {
+		poolSize = 1
 	}
-	client.Close()
+	pool := make(chan *gosseract.Client, poolSize)
+	for range poolSize {
+		c := gosseract.NewClient()
+		c.SetTessdataPrefix(tessdataDir)
+		if err := c.SetLanguage("rus"); err != nil {
+			c.Close()
+			return nil, fmt.Errorf("tesseract init failed (language 'rus'): %w", err)
+		}
+		pool <- c
+	}
 
-	logger.Info("tesseract provider ready", "tessdata", tessdataDir)
+	logger.Info("tesseract provider ready", "tessdata", tessdataDir, "pool", poolSize)
 	return &TesseractProvider{
-		logger:      logger,
-		tessdataDir: tessdataDir,
+		logger: logger,
+		pool:   pool,
 	}, nil
 }
 
 // RecognizeText runs Tesseract OCR on the supplied PNG/JPEG image bytes.
-// A fresh client is created per call so the provider is safe for concurrent use.
-func (t *TesseractProvider) RecognizeText(_ context.Context, imageData []byte) (string, error) {
-	client := gosseract.NewClient()
-	defer client.Close()
-
-	client.SetTessdataPrefix(t.tessdataDir)
-	if err := client.SetLanguage("rus"); err != nil {
-		return "", fmt.Errorf("set language failed: %w", err)
+// A client is borrowed from the pool for the duration of the call and returned
+// afterwards, so up to poolSize calls can run in parallel.
+func (t *TesseractProvider) RecognizeText(ctx context.Context, imageData []byte) (string, error) {
+	var client *gosseract.Client
+	select {
+	case client = <-t.pool:
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
+	defer func() { t.pool <- client }()
 
 	if err := client.SetImageFromBytes(imageData); err != nil {
 		return "", fmt.Errorf("set image failed: %w", err)

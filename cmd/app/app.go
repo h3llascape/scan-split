@@ -33,7 +33,9 @@ func New(logger *slog.Logger) *App {
 	var provider ocr.Provider
 	var providerName string
 
-	tp, err := ocr.NewTesseractProvider(logger)
+	const concurrency = 4
+
+	tp, err := ocr.NewTesseractProvider(logger, concurrency)
 	if err != nil {
 		logger.Warn("tesseract unavailable, using mock OCR", "err", err)
 		provider = ocr.NewMockProvider(logger)
@@ -43,7 +45,7 @@ func New(logger *slog.Logger) *App {
 		providerName = "Tesseract"
 	}
 
-	p := pipeline.New(pipeline.Config{Concurrency: 4}, provider, logger)
+	p := pipeline.New(pipeline.Config{Concurrency: concurrency}, provider, logger)
 	return &App{
 		logger:      logger,
 		pipeline:    p,
@@ -66,9 +68,8 @@ func (a *App) Startup(ctx context.Context) {
 				return
 			}
 		}
-		// If no PDF found, still emit the first path so the UI can show an error.
 		if len(paths) > 0 {
-			wailsruntime.EventsEmit(ctx, "file:drop", paths[0])
+			wailsruntime.EventsEmit(ctx, "file:drop:error", "Поддерживаются только PDF-файлы")
 		}
 	})
 }

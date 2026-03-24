@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"io"
 	"log/slog"
 	"testing"
 
@@ -11,6 +10,8 @@ import (
 // ── namesSimilar ─────────────────────────────────────────────────────────────
 
 func TestNamesSimilar(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		a, b string
 		want bool
@@ -50,6 +51,7 @@ func TestNamesSimilar(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.a+"|"+tc.b, func(t *testing.T) {
+			t.Parallel()
 			got := namesSimilar(tc.a, tc.b)
 			if got != tc.want {
 				t.Errorf("namesSimilar(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
@@ -81,13 +83,16 @@ func parsedNoName(n int) models.ParsedPage {
 //
 // Layout: [Иванов-title(0)][unnamed(1) ← cover of Петров][Петров-title(2)][unnamed(3) ← trailing/Петров nearest]
 func TestGroupByStudent_Basic(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsed(1, "Иванов Иван Иванович", "РИ-330001"),
 		parsedNoName(2), // immediately before Петров → cover-page heuristic → Петров
 		parsed(3, "Петров Пётр Петрович", "РИ-330002"),
 		parsedNoName(4), // nearest anchor Петров(idx2, dist=1) → Петров
 	}
-	students, orphans := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, orphans := p.groupByStudent(pages)
 
 	if len(orphans) != 0 {
 		t.Fatalf("expected 0 orphans, got %d", len(orphans))
@@ -107,13 +112,16 @@ func TestGroupByStudent_Basic(t *testing.T) {
 
 // Pages with different declensions of the same name must land in one bucket.
 func TestGroupByStudent_DeclensionMerge(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsed(1, "Малышев Иван Иванович", "РИ-330001"),
 		parsedNoName(2),
 		parsed(3, "Малышева Ивана Ивановича", ""), // same person, genitive
 		parsedNoName(4),
 	}
-	students, orphans := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, orphans := p.groupByStudent(pages)
 
 	if len(orphans) != 0 {
 		t.Fatalf("expected 0 orphans, got %d", len(orphans))
@@ -133,12 +141,15 @@ func TestGroupByStudent_DeclensionMerge(t *testing.T) {
 // Leading nameless pages appear before the student's title page (nearest-anchor
 // assigns them to the only named student found).
 func TestGroupByStudent_LeadingPages(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsedNoName(1),
 		parsedNoName(2),
 		parsed(3, "Иванов Иван Иванович", "РИ-330001"),
 	}
-	students, orphans := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, orphans := p.groupByStudent(pages)
 
 	if len(orphans) != 0 {
 		t.Fatalf("expected 0 orphans with nearest-anchor, got %d", len(orphans))
@@ -153,8 +164,11 @@ func TestGroupByStudent_LeadingPages(t *testing.T) {
 
 // Completely nameless PDF → all orphans.
 func TestGroupByStudent_AllOrphans(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{parsedNoName(1), parsedNoName(2)}
-	_, orphans := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	_, orphans := p.groupByStudent(pages)
 	if len(orphans) != 2 {
 		t.Fatalf("expected 2 orphans, got %d", len(orphans))
 	}
@@ -163,13 +177,16 @@ func TestGroupByStudent_AllOrphans(t *testing.T) {
 // Cover-page heuristic in action: unnamed page immediately before Трошов's title
 // is treated as Трошов's cover page — NOT the trailing body of Темирханова.
 func TestGroupByStudent_InterleavedAttachment(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsed(1, "Темирханова Зарина Кокеновна", "РИ-330001"), // idx 0
 		parsedNoName(2), // idx 1: immediately before Трошов → cover heuristic → Трошов
 		parsed(3, "Трошов Пётр Николаевич", "РИ-330002"), // idx 2
 		parsedNoName(4), // idx 3: nearest anchor Трошов(idx2, dist=1) → Трошов
 	}
-	students, _ := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, _ := p.groupByStudent(pages)
 
 	if len(students) != 2 {
 		t.Fatalf("expected 2 students, got %d", len(students))
@@ -194,13 +211,16 @@ func TestGroupByStudent_InterleavedAttachment(t *testing.T) {
 //	idx2: unnamed  → dist(0)=2 > dist(3)=1  → Трошов   ← key: goes to the FOLLOWING student
 //	idx3: Трошов title
 func TestGroupByStudent_UnnamedBeforeTitle(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsed(1, "Темирханова Зарина Кокеновна", "РИ-330001"), // idx 0
 		parsedNoName(2), // idx 1 → Темирханова (dist 1 vs 2)
 		parsedNoName(3), // idx 2 → Трошов    (dist 1 vs 2)
 		parsed(4, "Трошов Пётр Николаевич", "РИ-330002"), // idx 3
 	}
-	students, _ := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, _ := p.groupByStudent(pages)
 
 	if len(students) != 2 {
 		t.Fatalf("expected 2 students, got %d", len(students))
@@ -224,6 +244,9 @@ func TestGroupByStudent_UnnamedBeforeTitle(t *testing.T) {
 // Unnamed page just before the next student's title is closer to that student →
 // must NOT end up in the preceding student's file.
 func TestGroupByStudent_UnnamedCloserToNextStudent(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	// Layout: Темирханова(0) … body(1) … body(2) … Трошов-body(3) … Трошов-title(4)
 	// Page 3 is distance 1 from Трошов's title and distance 3 from Темирханова's.
 	pages := []models.ParsedPage{
@@ -233,7 +256,7 @@ func TestGroupByStudent_UnnamedCloserToNextStudent(t *testing.T) {
 		parsedNoName(4), // idx 3 → Трошов (dist 3 vs 1) ← key assertion
 		parsed(5, "Трошов Пётр Николаевич", "РИ-330002"), // idx 4
 	}
-	students, _ := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, _ := p.groupByStudent(pages)
 
 	if len(students) != 2 {
 		t.Fatalf("expected 2 students, got %d", len(students))
@@ -250,6 +273,9 @@ func TestGroupByStudent_UnnamedCloserToNextStudent(t *testing.T) {
 // Group back-fill: a nameless page that carries a group code should fill in
 // the student's group if it was unknown.
 func TestGroupByStudent_GroupBackfill(t *testing.T) {
+	t.Parallel()
+
+	p := New(Config{}, nil, slog.Default())
 	pages := []models.ParsedPage{
 		parsed(1, "Иванов Иван Иванович", ""), // no group on first page
 		{
@@ -257,7 +283,7 @@ func TestGroupByStudent_GroupBackfill(t *testing.T) {
 			Group: "РИ-330001", // group appears on second page
 		},
 	}
-	students, _ := groupByStudent(pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	students, _ := p.groupByStudent(pages)
 
 	if len(students) != 1 {
 		t.Fatalf("expected 1 student, got %d", len(students))
