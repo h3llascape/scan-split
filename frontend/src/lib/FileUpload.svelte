@@ -8,6 +8,7 @@
   export let onReady: () => void;
 
   let dragging = false;
+  let dropError = "";
 
   async function pickFile() {
     const path = await SelectInputFile();
@@ -34,9 +35,12 @@
     // Wails native file-drop: Go emits "file:drop" with the full native path.
     // The HTML5 DataTransfer API in WKWebView doesn't expose file.path.
     EventsOn("file:drop", (path: string) => {
-      if (path.toLowerCase().endsWith(".pdf")) {
-        inputPath = path;
-      }
+      inputPath = path;
+      dropError = "";
+    });
+
+    EventsOn("file:drop:error", (msg: string) => {
+      dropError = msg;
     });
 
     // On Windows (WebView2), Go's OnFileDrop callback never fires unless a
@@ -49,6 +53,7 @@
     document.removeEventListener("dragover", blockNativeDrop);
     document.removeEventListener("drop", blockNativeDrop);
     EventsOff("file:drop");
+    EventsOff("file:drop:error");
   });
 
   $: canProceed = inputPath !== "" && outputDir !== "";
@@ -77,6 +82,9 @@
         <span class="drop-hint">или нажмите чтобы выбрать</span>
       {/if}
     </div>
+    {#if dropError}
+      <p class="drop-error">{dropError}</p>
+    {/if}
   </div>
 
   <div class="card">
@@ -131,6 +139,13 @@
   .drop-zone:hover, .drop-zone.active {
     border-color: var(--accent);
     background: rgba(79,142,247,0.06);
+  }
+
+  .drop-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin-top: 6px;
+    text-align: center;
   }
 
   .drop-icon { font-size: 28px; line-height: 1; }
