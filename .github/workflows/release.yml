@@ -65,7 +65,7 @@ jobs:
 
       # windows-latest already ships MSYS2 at C:\msys64 — just install packages
       - name: Install Tesseract + GCC via pre-installed MSYS2
-        run: C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -Sy mingw-w64-x86_64-gcc mingw-w64-x86_64-tesseract-ocr mingw-w64-x86_64-leptonica"
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -Sy mingw-w64-x86_64-gcc mingw-w64-x86_64-tesseract-ocr mingw-w64-x86_64-leptonica mingw-w64-x86_64-ntldd-git"
         shell: cmd
 
       - name: Add MinGW64 to PATH
@@ -100,21 +100,21 @@ jobs:
           CC: C:/msys64/mingw64/bin/gcc.exe
           CXX: C:/msys64/mingw64/bin/g++.exe
 
-      - name: Bundle DLLs
+      - name: Bundle DLLs (auto-detect via ntldd)
         run: |
-          $mingw = "C:\msys64\mingw64\bin"
-          $out   = "build\bin"
-          $dlls  = @(
-            "libtesseract-5.dll", "libleptonica-6.dll",
-            "libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll",
-            "libpng16-16.dll",    "libjpeg-8.dll",   "libtiff-6.dll",
-            "libwebp-7.dll",      "libarchive-13.dll","libzstd.dll",
-            "liblz4.dll",         "liblzma-5.dll",   "zlib1.dll"
-          )
-          foreach ($dll in $dlls) {
-            $src = "$mingw\$dll"
-            if (Test-Path $src) { Copy-Item $src $out; Write-Host "copied $dll" }
-            else                { Write-Host "skipped (not found): $dll" }
+          $mingwBin = "C:\msys64\mingw64\bin"
+          $outDir   = "build\bin"
+          # ntldd -R walks all transitive DLL deps of the exe.
+          # We copy only those that live in MinGW64 (skip Windows system DLLs).
+          $deps = & "$mingwBin\ntldd.exe" -R "build\bin\scansplit.exe" 2>$null
+          foreach ($line in $deps) {
+            if ($line -match "=>\s+(.+\.dll)\s+\(") {
+              $path = $matches[1].Trim()
+              if ($path.StartsWith($mingwBin, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Copy-Item $path $outDir -Force
+                Write-Host "copied $(Split-Path $path -Leaf)"
+              }
+            }
           }
         shell: pwsh
 
