@@ -9,6 +9,25 @@ permissions:
   contents: write
 
 jobs:
+  # ─── Unit tests ───────────────────────────────────────────────────────────
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install system dependencies
+        run: brew install tesseract leptonica
+
+      - name: Run tests
+        run: go test ./...
+        env:
+          CGO_CXXFLAGS: -I/opt/homebrew/include
+          CGO_LDFLAGS: -L/opt/homebrew/lib
+
   # ─── macOS (arm64) ────────────────────────────────────────────────────────
   build-mac:
     runs-on: macos-14   # Apple Silicon runner
@@ -129,7 +148,7 @@ jobs:
 
   # ─── GitHub Release ───────────────────────────────────────────────────────
   release:
-    needs: [build-mac, build-win]
+    needs: [test, build-mac, build-win]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
