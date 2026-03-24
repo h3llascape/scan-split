@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── macOS (arm64) ────────────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-14   # Apple Silicon runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: brew install tesseract leptonica dylibbundler
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Download tessdata
+        run: make tessdata
+
+      - name: Build
+        run: wails build -platform darwin/arm64
+        env:
+          CGO_CXXFLAGS: -I/opt/homebrew/include
+          CGO_LDFLAGS: -L/opt/homebrew/lib
+
+      - name: Bundle Tesseract libraries into .app
+        run: |
+          APP=build/bin/scansplit.app
+          BIN=$APP/Contents/MacOS/scansplit
+          FWDIR=$APP/Contents/Frameworks
+          mkdir -p $FWDIR
+          dylibbundler -od -b -x $BIN -d $FWDIR -p @executable_path/../Frameworks
+
+      - name: Ad-hoc code sign (suppresses Gatekeeper warning on first launch)
+        run: codesign --force --deep --sign - build/bin/scansplit.app
+
+      - name: Zip
+        run: cd build/bin && zip -r scansplit-mac-arm64.zip scansplit.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-arm64
+          path: build/bin/scansplit-mac-arm64.zip
+
+  # ─── Windows (amd64) ──────────────────────────────────────────────────────
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tesseract via MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-tesseract-ocr
+            mingw-w64-x86_64-leptonica
+
+      # Make MinGW64 GCC available to Go's CGO
+      - name: Add MinGW64 to PATH
+        run: echo "C:\msys64\mingw64\bin" | Out-File -Append -FilePath $env:GITHUB_PATH
+        shell: pwsh
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+        shell: pwsh
+
+      - name: Download tessdata
+        run: |
+          New-Item -ItemType Directory -Force -Path internal\ocr\tessdata | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/rus.traineddata" `
+            -OutFile internal\ocr\tessdata\rus.traineddata
+        shell: pwsh
+
+      - name: Build
+        run: wails build -platform windows/amd64
+        shell: pwsh
+        env:
+          CGO_CXXFLAGS: -IC:/msys64/mingw64/include
+          CGO_LDFLAGS: -LC:/msys64/mingw64/lib
+          CC: C:/msys64/mingw64/bin/gcc.exe
+          CXX: C:/msys64/mingw64/bin/g++.exe
+
+      - name: Bundle DLLs
+        run: |
+          $mingw = "C:\msys64\mingw64\bin"
+          $out   = "build\bin"
+          $dlls  = @(
+            "libtesseract-5.dll", "libleptonica-6.dll",
+            "libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll",
+            "libpng16-16.dll",    "libjpeg-8.dll",   "libtiff-6.dll",
+            "libwebp-7.dll",      "libarchive-13.dll","libzstd.dll",
+            "liblz4.dll",         "liblzma-5.dll",   "zlib1.dll"
+          )
+          foreach ($dll in $dlls) {
+            $src = "$mingw\$dll"
+            if (Test-Path $src) { Copy-Item $src $out; Write-Host "copied $dll" }
+            else                { Write-Host "skipped (not found): $dll" }
+          }
+        shell: pwsh
+
+      - name: Zip
+        run: Compress-Archive -Path build\bin\* -DestinationPath build\bin\scansplit-windows-amd64.zip
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-amd64
+          path: build/bin/scansplit-windows-amd64.zip
+
+  # ─── GitHub Release ───────────────────────────────────────────────────────
+  release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: win-amd64
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            scansplit-mac-arm64.zip
+            scansplit-windows-amd64.zip

@@ -13,7 +13,7 @@
 #       Run `make tessdata` if the file is missing.
 # ─────────────────────────────────────────────────────────────────────────────
 
-WAILS       := wails
+WAILS       := $(shell go env GOPATH)/bin/wails
 TESSDATA    := internal/ocr/tessdata/rus.traineddata
 TESSDATA_URL := https://github.com/tesseract-ocr/tessdata_fast/raw/main/rus.traineddata
 
@@ -56,8 +56,8 @@ build-mac: check-tessdata
 .PHONY: bundle-mac
 bundle-mac: build-mac
 	@which dylibbundler > /dev/null || (echo "Run: brew install dylibbundler" && exit 1)
-	@APP=build/bin/ScanSplit.app; \
-	  BIN=$$APP/Contents/MacOS/ScanSplit; \
+	@APP=build/bin/scansplit.app; \
+	  BIN=$$APP/Contents/MacOS/scansplit; \
 	  FWDIR=$$APP/Contents/Frameworks; \
 	  mkdir -p $$FWDIR; \
 	  dylibbundler -od -b -x $$BIN -d $$FWDIR -p @executable_path/../Frameworks; \
