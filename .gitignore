@@ -1,0 +1,26 @@
+build/bin
+node_modules
+frontend/dist
+.claude
+
+# tessdata models (large files — download via `make tessdata`)
+internal/ocr/tessdata/*.traineddata
+debug
+
+# Go
+vendor/                                                                                                                                                                                                          
+*.test                                                                                                                                                                                                         
+                                                                                                                                                                                                                
+# macOS                                                                                                                                                                                                        
+.DS_Store
+
+# Wails dev artifacts
+/debug/          
+                                                                                                                                                                                                                
+# OS temp
+*.tmp                                                                                                                                                                                                            
+*.log                                                                                                                                                                                                          
+
+# IDE
+.vscode/
+.idea/
