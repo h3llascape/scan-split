@@ -1,7 +1,6 @@
 package pdf
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"image/png"
@@ -36,13 +35,8 @@ func RenderPage(_ context.Context, pagePDFPath, imageDir string) (string, error)
 	}
 	defer f.Close()
 
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
+	if err := png.Encode(f, img); err != nil {
 		return "", fmt.Errorf("failed to encode PNG: %w", err)
-	}
-
-	if _, err := f.Write(buf.Bytes()); err != nil {
-		return "", fmt.Errorf("failed to write PNG: %w", err)
 	}
 
 	return outPath, nil

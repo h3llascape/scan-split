@@ -513,10 +513,13 @@ func hasInitials(name string) bool {
 	return false
 }
 
+// yoReplacer is compiled once and reused across all namesSimilar calls.
+var yoReplacer = strings.NewReplacer("ё", "е", "Ё", "Е")
+
 // normaliseYo replaces 'ё'/'Ё' with 'е'/'Е' so that OCR variants and
 // declension-driven vowel shifts (Пётр→Петра) don't break prefix matching.
 func normaliseYo(s string) string {
-	return strings.NewReplacer("ё", "е", "Ё", "Е").Replace(s)
+	return yoReplacer.Replace(s)
 }
 
 // saveStudent merges the student's pages into a single PDF and writes it to outputDir.

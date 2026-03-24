@@ -24,7 +24,9 @@
     progress = null;
     error = null;
     result = null;
-    ProcessFile(inputPath, outputDir);
+    ProcessFile(inputPath, outputDir).catch((err: unknown) => {
+      error = err instanceof Error ? err.message : String(err);
+    });
   }
 
   function reset() {
