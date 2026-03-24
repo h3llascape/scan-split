@@ -1,3 +1,5 @@
+//go:build !freebsd && !windows
+
 package gosseract
 
 // #cgo CXXFLAGS: -std=c++0x
