@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { EventsOn, EventsOff } from "../../wailsjs/runtime/runtime.js";
+  import { EventsOn, EventsOff, OnFileDrop } from "../../wailsjs/runtime/runtime.js";
   import { SelectInputFile, SelectOutputDir } from "../../wailsjs/go/app/App.js";
 
   export let inputPath: string = "";
@@ -38,6 +38,11 @@
         inputPath = path;
       }
     });
+
+    // On Windows (WebView2), Go's OnFileDrop callback never fires unless a
+    // JS-side OnFileDrop handler is also registered (Wails issue #3985).
+    // Register a no-op handler here to activate the bridge.
+    OnFileDrop((_x: number, _y: number, _paths: string[]) => {}, false);
   });
 
   onDestroy(() => {

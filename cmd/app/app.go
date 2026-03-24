@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/exec"
 	goruntime "runtime"
+	"strings"
 	"sync"
 
 	"github.com/hellascape/scansplit/internal/models"
@@ -60,7 +61,7 @@ func (a *App) Startup(ctx context.Context) {
 	// in DataTransfer, so the standard HTML5 DnD API can't provide the full path).
 	wailsruntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		for _, p := range paths {
-			if len(p) > 4 && p[len(p)-4:] == ".pdf" {
+			if strings.HasSuffix(strings.ToLower(p), ".pdf") {
 				wailsruntime.EventsEmit(ctx, "file:drop", p)
 				return
 			}

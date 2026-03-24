@@ -36,9 +36,12 @@ func main() {
 		Bind:             []interface{}{a},
 		// EnableFileDrop activates runtime.OnFileDrop so we get the full native
 		// file path when the user drags a PDF onto the window.
+		// DisableWebViewDrop is intentionally NOT set: the frontend's blockNativeDrop
+		// already calls preventDefault() on drop, preventing WebView from opening
+		// the file as a document. Leaving WebView drop enabled allows HTML5
+		// dragover/dragleave events to fire so the drop zone highlights correctly.
 		DragAndDrop: &options.DragAndDrop{
-			EnableFileDrop:     true,
-			DisableWebViewDrop: true,
+			EnableFileDrop: true,
 		},
 	}); err != nil {
 		logger.Error("application error", "err", err)
