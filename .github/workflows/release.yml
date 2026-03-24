@@ -22,8 +22,13 @@ jobs:
       - name: Install system dependencies
         run: brew install tesseract leptonica
 
+      - name: Download tessdata
+        run: make tessdata
+
       - name: Run tests
-        run: go test ./...
+        # Exclude root package (needs frontend/dist) and cmd/app (same).
+        # All meaningful tests live under internal/ and cmd/debug.
+        run: go test ./internal/... ./cmd/debug/...
         env:
           CGO_CXXFLAGS: -I/opt/homebrew/include
           CGO_LDFLAGS: -L/opt/homebrew/lib
