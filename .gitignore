@@ -5,7 +5,6 @@ frontend/dist
 
 # tessdata models (large files — download via `make tessdata`)
 internal/ocr/tessdata/*.traineddata
-debug
 
 # Go
 vendor/                                                                                                                                                                                                          
