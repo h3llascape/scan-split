@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hellascape/scansplit/internal/models"
-	"github.com/hellascape/scansplit/internal/ocr"
-	"github.com/hellascape/scansplit/internal/pipeline"
+	"github.com/h3llascape/scan-split/internal/models"
+	"github.com/h3llascape/scan-split/internal/ocr"
+	"github.com/h3llascape/scan-split/internal/pipeline"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

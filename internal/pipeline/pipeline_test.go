@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/hellascape/scansplit/internal/models"
+	"github.com/h3llascape/scan-split/internal/models"
 )
 
 // ── namesSimilar ─────────────────────────────────────────────────────────────

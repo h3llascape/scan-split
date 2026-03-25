@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/hellascape/scansplit/internal/models"
-	"github.com/hellascape/scansplit/internal/ocr"
-	"github.com/hellascape/scansplit/internal/pdf"
+	"github.com/h3llascape/scan-split/internal/models"
+	"github.com/h3llascape/scan-split/internal/ocr"
+	"github.com/h3llascape/scan-split/internal/pdf"
 )
 
 // Config holds tunable pipeline parameters.

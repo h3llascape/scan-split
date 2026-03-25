@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hellascape/scansplit/internal/models"
-	"github.com/hellascape/scansplit/internal/pdf"
+	"github.com/h3llascape/scan-split/internal/models"
+	"github.com/h3llascape/scan-split/internal/pdf"
 )
 
 // saveStudent extracts the student's pages from the original PDF into outputDir.

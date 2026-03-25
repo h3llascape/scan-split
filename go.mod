@@ -1,4 +1,4 @@
-module github.com/hellascape/scansplit
+module github.com/h3llascape/scan-split
 
 go 1.26
 
