@@ -3,14 +3,19 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hellascape/scansplit/internal/models"
 	"github.com/hellascape/scansplit/internal/ocr"
 	"github.com/hellascape/scansplit/internal/pdf"
 )
+
+type workItem struct {
+	index int
+	page  models.Page
+}
 
 // renderAndOCR runs render→OCR→parse on all pages using a concurrent worker pool.
 // Results are written into a pre-allocated slice at the original page index so
@@ -18,14 +23,8 @@ import (
 func (p *Pipeline) renderAndOCR(
 	ctx context.Context,
 	pages []models.Page,
-	imageDir string,
 	progress ProgressCallback,
-) ([]models.ParsedPage, []string) {
-	type workItem struct {
-		index int
-		page  models.Page
-	}
-
+) ([]models.ParsedPage, []string, int64) {
 	work := make(chan workItem, len(pages))
 	for i, pg := range pages {
 		work <- workItem{index: i, page: pg}
@@ -38,6 +37,7 @@ func (p *Pipeline) renderAndOCR(
 		errs      []string
 		wg        sync.WaitGroup
 		completed atomic.Int64
+		totalMs   atomic.Int64
 	)
 
 	for range p.cfg.Concurrency {
@@ -47,7 +47,9 @@ func (p *Pipeline) renderAndOCR(
 					return
 				}
 
-				parsed, procErr := p.processPage(ctx, item.page, imageDir)
+				t0 := time.Now()
+				parsed, procErr := p.processPage(ctx, item.page)
+				totalMs.Add(time.Since(t0).Milliseconds())
 				if procErr != nil {
 					p.logger.Error("page processing failed", "page", item.page.Number, "err", procErr)
 					errsMu.Lock()
@@ -70,25 +72,19 @@ func (p *Pipeline) renderAndOCR(
 	}
 
 	wg.Wait()
-	return results, errs
+	var avgMs int64
+	if n := int64(len(pages)); n > 0 {
+		avgMs = totalMs.Load() / n
+	}
+	return results, errs, avgMs
 }
 
-// processPage renders one page to an image and runs OCR + parse on it.
-func (p *Pipeline) processPage(ctx context.Context, page models.Page, imageDir string) (models.ParsedPage, error) {
-	imagePath, renderErr := pdf.RenderPage(ctx, page.PDFPath, imageDir)
+// processPage renders one page to PNG bytes in memory and runs OCR + parse on it.
+func (p *Pipeline) processPage(ctx context.Context, page models.Page) (models.ParsedPage, error) {
+	imageData, renderErr := pdf.RenderPage(ctx, page.PDFPath)
 	if renderErr != nil {
 		// Warn but continue — mock OCR does not need an actual image.
 		p.logger.Warn("render failed, continuing with empty image", "page", page.Number, "err", renderErr)
-	}
-	page.ImagePath = imagePath
-
-	var imageData []byte
-	if imagePath != "" {
-		var readErr error
-		imageData, readErr = os.ReadFile(imagePath)
-		if readErr != nil {
-			p.logger.Warn("failed to read rendered image", "path", imagePath, "err", readErr)
-		}
 	}
 
 	ocrText, err := p.ocr.RecognizeText(ctx, imageData)

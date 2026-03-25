@@ -54,7 +54,7 @@ func (p *Pipeline) Run(
 		progress = func(models.ProcessingProgress) {}
 	}
 
-	tmpDir, splitDir, imageDir, err := makeTempDirs()
+	tmpDir, splitDir, err := makeTempDirs()
 	if err != nil {
 		return nil, err
 	}
@@ -77,9 +77,9 @@ func (p *Pipeline) Run(
 	}
 	p.logger.Info("split complete", "pages", len(pages))
 
-	parsedPages, errs := p.renderAndOCR(ctx, pages, imageDir, progress)
+	parsedPages, errs, avgPageMs := p.renderAndOCR(ctx, pages, progress)
 
-	result := &models.ProcessingResult{Errors: errs}
+	result := &models.ProcessingResult{Errors: errs, AvgPageMs: avgPageMs}
 
 	progress(models.ProcessingProgress{
 		Stage:       "grouping",
@@ -146,19 +146,16 @@ func (p *Pipeline) Run(
 	return result, nil
 }
 
-// makeTempDirs creates a temp root with split/ and images/ subdirectories.
-func makeTempDirs() (tmpDir, splitDir, imageDir string, err error) {
+// makeTempDirs creates a temp root with a split/ subdirectory.
+func makeTempDirs() (tmpDir, splitDir string, err error) {
 	tmpDir, err = os.MkdirTemp("", "scansplit-*")
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to create temp dir: %w", err)
+		return "", "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	splitDir = filepath.Join(tmpDir, "split")
-	imageDir = filepath.Join(tmpDir, "images")
-	for _, d := range []string{splitDir, imageDir} {
-		if mkErr := os.MkdirAll(d, 0o755); mkErr != nil {
-			os.RemoveAll(tmpDir)
-			return "", "", "", fmt.Errorf("failed to create dir %q: %w", d, mkErr)
-		}
+	if mkErr := os.MkdirAll(splitDir, 0o755); mkErr != nil {
+		os.RemoveAll(tmpDir)
+		return "", "", fmt.Errorf("failed to create dir %q: %w", splitDir, mkErr)
 	}
 	return
 }

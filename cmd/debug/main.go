@@ -45,12 +45,7 @@ func main() {
 	defer os.RemoveAll(tmpDir)
 
 	splitDir := tmpDir + "/split"
-	imageDir := tmpDir + "/images"
 	if err := os.MkdirAll(splitDir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
-		os.Exit(1)
-	}
-	if err := os.MkdirAll(imageDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
 		os.Exit(1)
 	}
@@ -69,16 +64,9 @@ func main() {
 	var parsedPages []models.ParsedPage
 
 	for _, pg := range pages {
-		imgPath, renderErr := pdf.RenderPage(ctx, pg.PDFPath, imageDir)
+		imgData, renderErr := pdf.RenderPage(ctx, pg.PDFPath)
 		if renderErr != nil {
 			fmt.Printf("Page %2d: RENDER ERROR: %v\n\n", pg.Number, renderErr)
-			parsedPages = append(parsedPages, models.ParsedPage{Page: pg, IsOrphan: true})
-			continue
-		}
-
-		imgData, readErr := os.ReadFile(imgPath)
-		if readErr != nil {
-			fmt.Printf("Page %2d: READ ERROR: %v\n\n", pg.Number, readErr)
 			parsedPages = append(parsedPages, models.ParsedPage{Page: pg, IsOrphan: true})
 			continue
 		}

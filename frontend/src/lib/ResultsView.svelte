@@ -9,6 +9,14 @@
   async function openFolder() {
     await OpenResultsFolder(outputDir);
   }
+
+  function pluralStudents(n: number): string {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return "студент обработан";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "студента обработано";
+    return "студентов обработано";
+  }
 </script>
 
 <div class="wrapper">
@@ -17,8 +25,14 @@
   <div class="summary-row">
     <div class="stat">
       <span class="stat-val tag tag-ok">{result.OutputFiles?.length ?? 0}</span>
-      <span class="stat-lbl">студентов обработано</span>
+      <span class="stat-lbl">{pluralStudents(result.OutputFiles?.length ?? 0)}</span>
     </div>
+    {#if result.AvgPageMs > 0}
+      <div class="stat">
+        <span class="stat-val tag tag-ok">{result.AvgPageMs} мс</span>
+        <span class="stat-lbl">среднее время страницы</span>
+      </div>
+    {/if}
     {#if result.Orphans?.length}
       <div class="stat">
         <span class="stat-val tag tag-orphan">{result.Orphans.length}</span>

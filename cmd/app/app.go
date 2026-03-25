@@ -33,7 +33,7 @@ func New(logger *slog.Logger) *App {
 	var provider ocr.Provider
 	var providerName string
 
-	const concurrency = 4
+	concurrency := min(goruntime.NumCPU(), 8)
 
 	tp, err := ocr.NewTesseractProvider(logger, concurrency)
 	if err != nil {

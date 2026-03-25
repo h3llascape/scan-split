@@ -38,4 +38,5 @@ export interface ProcessingResult {
   OutputFiles: OutputFile[];
   Orphans: ParsedPage[];
   Errors: string[];
+  AvgPageMs: number;
 }

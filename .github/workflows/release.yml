@@ -11,27 +11,33 @@ permissions:
 jobs:
   # ─── Unit tests ───────────────────────────────────────────────────────────
   test:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
+
+      - name: Cache tessdata
+        id: cache-tessdata
+        uses: actions/cache@v4
+        with:
+          path: internal/ocr/tessdata
+          key: tessdata-rus-fast
 
       - name: Install system dependencies
-        run: brew install tesseract leptonica
+        run: sudo apt-get install -y tesseract-ocr libtesseract-dev libleptonica-dev
 
       - name: Download tessdata
+        if: steps.cache-tessdata.outputs.cache-hit != 'true'
         run: make tessdata
 
       - name: Run tests
         # Exclude root package (needs frontend/dist) and cmd/app (same).
         # All meaningful tests live under internal/ and cmd/debug.
         run: go test ./internal/... ./cmd/debug/...
-        env:
-          CGO_CXXFLAGS: -I/opt/homebrew/include
-          CGO_LDFLAGS: -L/opt/homebrew/lib
 
   # ─── macOS (arm64) ────────────────────────────────────────────────────────
   build-mac:

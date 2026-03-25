@@ -2,10 +2,9 @@ package models
 
 // Page represents a single page extracted from the source PDF.
 type Page struct {
-	Number    int    // 1-based page number in the source PDF
-	PDFPath   string // Path to single-page PDF (temp file)
-	ImagePath string // Path to rendered PNG/JPEG for OCR (temp file, may be empty)
-	OCRText   string // Raw recognized text from OCR
+	Number  int    // 1-based page number in the source PDF
+	PDFPath string // Path to single-page PDF (temp file)
+	OCRText string // Raw recognized text from OCR
 }
 
 // ParsedPage holds the OCR and parse results for a single page.
@@ -33,9 +32,10 @@ type OutputFile struct {
 
 // ProcessingResult is the final result returned after the pipeline completes.
 type ProcessingResult struct {
-	OutputFiles []OutputFile // Successfully created student files
-	Orphans     []ParsedPage // Pages that could not be attributed to any student
-	Errors      []string     // Non-fatal errors collected during processing
+	OutputFiles  []OutputFile // Successfully created student files
+	Orphans      []ParsedPage // Pages that could not be attributed to any student
+	Errors       []string     // Non-fatal errors collected during processing
+	AvgPageMs    int64        // Average render+OCR time per page in milliseconds
 }
 
 // ProcessingProgress describes the current state of pipeline execution.
