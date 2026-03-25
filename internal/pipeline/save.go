@@ -10,22 +10,25 @@ import (
 	"github.com/hellascape/scansplit/internal/pdf"
 )
 
-// saveStudent merges the student's pages into a single PDF and writes it to outputDir.
+// saveStudent extracts the student's pages from the original PDF into outputDir.
 func (p *Pipeline) saveStudent(ctx context.Context, student models.Student, outputDir string) (models.OutputFile, error) {
 	if len(student.Pages) == 0 {
 		return models.OutputFile{}, fmt.Errorf("student %q has no pages", student.FullName)
+	}
+	if ctx.Err() != nil {
+		return models.OutputFile{}, ctx.Err()
 	}
 
 	fileName := safeFileName(student.FullName, student.Group) + ".pdf"
 	outputPath := filepath.Join(outputDir, fileName)
 
-	pagePaths := make([]string, len(student.Pages))
+	pageNums := make([]int, len(student.Pages))
 	for i, pg := range student.Pages {
-		pagePaths[i] = pg.PDFPath
+		pageNums[i] = pg.Number
 	}
 
-	if err := pdf.MergePages(ctx, pagePaths, outputPath); err != nil {
-		return models.OutputFile{}, fmt.Errorf("merge failed: %w", err)
+	if err := pdf.ExtractPages(student.Pages[0].SourcePath, outputPath, pageNums); err != nil {
+		return models.OutputFile{}, fmt.Errorf("extract failed: %w", err)
 	}
 
 	p.logger.Info("saved student", "name", student.FullName, "pages", len(student.Pages), "path", outputPath)
@@ -38,10 +41,14 @@ func (p *Pipeline) saveStudent(ctx context.Context, student models.Student, outp
 
 // saveOrphan saves a single unrecognised page as an individual PDF.
 func (p *Pipeline) saveOrphan(ctx context.Context, page models.Page, outputDir string) (models.OutputFile, error) {
+	if ctx.Err() != nil {
+		return models.OutputFile{}, ctx.Err()
+	}
+
 	fileName := fmt.Sprintf("неопознанная_стр_%02d.pdf", page.Number)
 	outPath := filepath.Join(outputDir, fileName)
 
-	if err := pdf.MergePages(ctx, []string{page.PDFPath}, outPath); err != nil {
+	if err := pdf.ExtractPages(page.SourcePath, outPath, []int{page.Number}); err != nil {
 		return models.OutputFile{}, err
 	}
 

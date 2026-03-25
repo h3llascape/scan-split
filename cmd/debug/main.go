@@ -29,42 +29,36 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
-	// ── Init OCR ──────────────────────────────────────────────────────────────
 	ocrProvider, err := ocr.NewTesseractProvider(logger, 1)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tesseract init: %v\n", err)
 		os.Exit(1)
 	}
 
-	// ── Split ─────────────────────────────────────────────────────────────────
-	tmpDir, err := os.MkdirTemp("", "scansplit-debug-*")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "mktemp: %v\n", err)
-		os.Exit(1)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	splitDir := tmpDir + "/split"
-	if err := os.MkdirAll(splitDir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
-		os.Exit(1)
-	}
-
 	ctx := context.Background()
-	pages, err := pdf.SplitPages(ctx, inputPath, splitDir)
+
+	pageCount, err := pdf.PageCount(inputPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "split: %v\n", err)
+		fmt.Fprintf(os.Stderr, "page count: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("PDF: %s\n", inputPath)
-	fmt.Printf("Total pages: %d\n\n", len(pages))
+	fmt.Printf("Total pages: %d\n\n", pageCount)
 
-	// ── Per-page OCR + parse ──────────────────────────────────────────────────
+	doc, err := pdf.OpenDocument(inputPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open PDF: %v\n", err)
+		os.Exit(1)
+	}
+	defer doc.Close()
+
 	var parsedPages []models.ParsedPage
 
-	for _, pg := range pages {
-		imgData, renderErr := pdf.RenderPage(ctx, pg.PDFPath)
+	for i := range pageCount {
+		pg := models.Page{Number: i + 1, SourcePath: inputPath}
+
+		imgData, renderErr := doc.RenderPage(i)
 		if renderErr != nil {
 			fmt.Printf("Page %2d: RENDER ERROR: %v\n\n", pg.Number, renderErr)
 			parsedPages = append(parsedPages, models.ParsedPage{Page: pg, IsOrphan: true})
@@ -97,7 +91,6 @@ func main() {
 		})
 	}
 
-	// ── Grouping using the real pipeline logic ────────────────────────────────
 	fmt.Println("══ GROUPING (real pipeline) ══════════════════════════════")
 
 	p := pipeline.New(pipeline.Config{}, nil, logger)
@@ -118,8 +111,6 @@ func main() {
 		}
 	}
 }
-
-// ── helpers ───────────────────────────────────────────────────────────────────
 
 func truncate(s string, maxRunes int) string {
 	runes := []rune(s)

@@ -1,5 +1,5 @@
 // Package pipeline orchestrates the full PDF processing workflow:
-// split → render → OCR → parse → group → merge & save.
+// render → OCR → parse → group → extract & save.
 package pipeline
 
 import (
@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/hellascape/scansplit/internal/models"
 	"github.com/hellascape/scansplit/internal/ocr"
@@ -42,9 +41,13 @@ func New(cfg Config, ocrProvider ocr.Provider, logger *slog.Logger) *Pipeline {
 	}
 }
 
+// GroupPages exposes groupByStudent for the debug CLI.
+func (p *Pipeline) GroupPages(pages []models.ParsedPage) ([]models.Student, []models.ParsedPage) {
+	return p.groupByStudent(pages)
+}
+
 // Run executes the full pipeline and returns the processing result.
 // progress is called on every meaningful state change and may be nil.
-// Intermediate files are cleaned up via defer before Run returns.
 func (p *Pipeline) Run(
 	ctx context.Context,
 	inputPath, outputDir string,
@@ -54,28 +57,26 @@ func (p *Pipeline) Run(
 		progress = func(models.ProcessingProgress) {}
 	}
 
-	tmpDir, splitDir, err := makeTempDirs()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if rmErr := os.RemoveAll(tmpDir); rmErr != nil {
-			p.logger.Warn("failed to remove temp dir", "path", tmpDir, "err", rmErr)
-		}
-	}()
-
 	progress(models.ProcessingProgress{
-		Stage:       "splitting",
+		Stage:       "counting",
 		Current:     0,
 		Total:       1,
-		Description: "Разделение PDF на страницы…",
+		Description: "Чтение PDF…",
 	})
 
-	pages, err := pdf.SplitPages(ctx, inputPath, splitDir)
+	pageCount, err := pdf.PageCount(inputPath)
 	if err != nil {
-		return nil, fmt.Errorf("split stage failed: %w", err)
+		return nil, fmt.Errorf("failed to read PDF: %w", err)
 	}
-	p.logger.Info("split complete", "pages", len(pages))
+	if pageCount == 0 {
+		return nil, fmt.Errorf("PDF has no pages: %s", inputPath)
+	}
+
+	pages := make([]models.Page, pageCount)
+	for i := range pages {
+		pages[i] = models.Page{Number: i + 1, SourcePath: inputPath}
+	}
+	p.logger.Info("PDF loaded", "pages", pageCount)
 
 	parsedPages, errs, avgPageMs := p.renderAndOCR(ctx, pages, progress)
 
@@ -144,18 +145,4 @@ func (p *Pipeline) Run(
 	}
 
 	return result, nil
-}
-
-// makeTempDirs creates a temp root with a split/ subdirectory.
-func makeTempDirs() (tmpDir, splitDir string, err error) {
-	tmpDir, err = os.MkdirTemp("", "scansplit-*")
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	splitDir = filepath.Join(tmpDir, "split")
-	if mkErr := os.MkdirAll(splitDir, 0o755); mkErr != nil {
-		os.RemoveAll(tmpDir)
-		return "", "", fmt.Errorf("failed to create dir %q: %w", splitDir, mkErr)
-	}
-	return
 }

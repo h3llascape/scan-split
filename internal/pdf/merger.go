@@ -1,26 +1,30 @@
 package pdf
 
 import (
-	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	pdfmodel "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
 
-// MergePages merges the given single-page PDF files into a single output PDF at outputPath.
-// Pages appear in the same order as inputPaths.
-func MergePages(_ context.Context, inputPaths []string, outputPath string) error {
-	if len(inputPaths) == 0 {
-		return fmt.Errorf("no input pages to merge")
+// ExtractPages extracts the specified 1-based page numbers from srcPath
+// into a new PDF at outputPath, preserving the given order.
+func ExtractPages(srcPath, outputPath string, pageNumbers []int) error {
+	if len(pageNumbers) == 0 {
+		return fmt.Errorf("no pages to extract")
+	}
+
+	sel := make([]string, len(pageNumbers))
+	for i, n := range pageNumbers {
+		sel[i] = strconv.Itoa(n)
 	}
 
 	conf := pdfmodel.NewDefaultConfiguration()
 	conf.ValidationMode = pdfmodel.ValidationRelaxed
 
-	if err := api.MergeCreateFile(inputPaths, outputPath, false, conf); err != nil {
-		return fmt.Errorf("failed to merge into %q: %w", outputPath, err)
+	if err := api.CollectFile(srcPath, outputPath, sel, conf); err != nil {
+		return fmt.Errorf("failed to extract pages into %q: %w", outputPath, err)
 	}
-
 	return nil
 }

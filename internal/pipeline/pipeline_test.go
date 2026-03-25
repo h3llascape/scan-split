@@ -63,7 +63,7 @@ func TestNamesSimilar(t *testing.T) {
 // ── groupByStudent ────────────────────────────────────────────────────────────
 
 func page(n int, path string) models.Page {
-	return models.Page{Number: n, PDFPath: path}
+	return models.Page{Number: n, SourcePath: path}
 }
 
 func parsed(n int, name, group string) models.ParsedPage {

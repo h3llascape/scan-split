@@ -20,11 +20,6 @@ type (
 	}
 )
 
-// GroupPages exposes groupByStudent for the debug CLI.
-func (p *Pipeline) GroupPages(pages []models.ParsedPage) ([]models.Student, []models.ParsedPage) {
-	return p.groupByStudent(pages)
-}
-
 // groupByStudent groups pages by recognised student name.
 //
 // Two-pass algorithm:

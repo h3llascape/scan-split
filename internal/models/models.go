@@ -1,10 +1,10 @@
 package models
 
-// Page represents a single page extracted from the source PDF.
+// Page represents a single page from the source PDF.
 type Page struct {
-	Number  int    // 1-based page number in the source PDF
-	PDFPath string // Path to single-page PDF (temp file)
-	OCRText string // Raw recognized text from OCR
+	Number     int    // 1-based page number in the source PDF
+	SourcePath string // Path to the original multi-page PDF
+	OCRText    string // Raw recognized text from OCR
 }
 
 // ParsedPage holds the OCR and parse results for a single page.

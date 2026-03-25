@@ -13,21 +13,41 @@ import (
 )
 
 type workItem struct {
-	index int
-	page  models.Page
+	index     int
+	page      models.Page
+	imageData []byte
 }
 
-// renderAndOCR runs render→OCR→parse on all pages using a concurrent worker pool.
-// Results are written into a pre-allocated slice at the original page index so
-// output order is stable regardless of completion order.
+// renderAndOCR renders all pages sequentially (MuPDF is not thread-safe),
+// then fans out OCR+parse to a concurrent worker pool.
 func (p *Pipeline) renderAndOCR(
 	ctx context.Context,
 	pages []models.Page,
 	progress ProgressCallback,
 ) ([]models.ParsedPage, []string, int64) {
+	doc, openErr := pdf.OpenDocument(pages[0].SourcePath)
+	if openErr != nil {
+		return nil, []string{fmt.Sprintf("failed to open PDF: %v", openErr)}, 0
+	}
+
+	images := make([][]byte, len(pages))
+	for i, pg := range pages {
+		if ctx.Err() != nil {
+			doc.Close()
+			return nil, []string{"processing cancelled"}, 0
+		}
+		data, err := doc.RenderPage(pg.Number - 1)
+		if err != nil {
+			p.logger.Warn("render failed, continuing with empty image", "page", pg.Number, "err", err)
+		}
+		images[i] = data
+	}
+	doc.Close()
+
+	// Phase 2: OCR + parse in parallel.
 	work := make(chan workItem, len(pages))
 	for i, pg := range pages {
-		work <- workItem{index: i, page: pg}
+		work <- workItem{index: i, page: pg, imageData: images[i]}
 	}
 	close(work)
 
@@ -48,7 +68,7 @@ func (p *Pipeline) renderAndOCR(
 				}
 
 				t0 := time.Now()
-				parsed, procErr := p.processPage(ctx, item.page)
+				parsed, procErr := p.processPage(ctx, item.page, item.imageData)
 				totalMs.Add(time.Since(t0).Milliseconds())
 				if procErr != nil {
 					p.logger.Error("page processing failed", "page", item.page.Number, "err", procErr)
@@ -79,14 +99,8 @@ func (p *Pipeline) renderAndOCR(
 	return results, errs, avgMs
 }
 
-// processPage renders one page to PNG bytes in memory and runs OCR + parse on it.
-func (p *Pipeline) processPage(ctx context.Context, page models.Page) (models.ParsedPage, error) {
-	imageData, renderErr := pdf.RenderPage(ctx, page.PDFPath)
-	if renderErr != nil {
-		// Warn but continue — mock OCR does not need an actual image.
-		p.logger.Warn("render failed, continuing with empty image", "page", page.Number, "err", renderErr)
-	}
-
+// processPage runs OCR + parse on pre-rendered image data.
+func (p *Pipeline) processPage(ctx context.Context, page models.Page, imageData []byte) (models.ParsedPage, error) {
 	ocrText, err := p.ocr.RecognizeText(ctx, imageData)
 	if err != nil {
 		return models.ParsedPage{}, fmt.Errorf("OCR failed for page %d: %w", page.Number, err)
