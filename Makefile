@@ -86,10 +86,29 @@ bundle-win: build-win
 
 # ── Utility ──────────────────────────────────────────────────────────────────
 
-.PHONY: tidy
-tidy:
-	go mod tidy
-
 .PHONY: clean
 clean:
 	rm -rf build/bin/
+
+# ── Quality ──────────────────────────────────────────────────────────────────
+
+GOLANGCI_LINT := bin/golangci-lint
+GOLANGCI_LINT_VERSION := v2.10.1
+
+$(GOLANGCI_LINT):
+	GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+.PHONY: test
+test: check-tessdata
+	go test -v ./...
+
+.PHONY: test-cover
+test-cover: check-tessdata
+	go test -v -cover ./... 
+
+.PHONY: lint
+lint: $(GOLANGCI_LINT)
+	$(GOLANGCI_LINT) run ./...
+
+.PHONY: check
+check: lint test

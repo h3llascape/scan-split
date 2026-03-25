@@ -62,9 +62,9 @@ func NewTesseractProvider(logger *slog.Logger, poolSize int) (*TesseractProvider
 	pool := make(chan *gosseract.Client, poolSize)
 	for range poolSize {
 		c := gosseract.NewClient()
-		c.SetTessdataPrefix(tessdataDir)
+		c.SetTessdataPrefix(tessdataDir) //nolint:errcheck // no meaningful recovery
 		if err := c.SetLanguage("rus"); err != nil {
-			c.Close()
+			c.Close() //nolint:errcheck // best-effort cleanup
 			return nil, fmt.Errorf("tesseract init failed (language 'rus'): %w", err)
 		}
 		pool <- c

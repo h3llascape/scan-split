@@ -26,7 +26,7 @@ func OpenDocument(pdfPath string) (*Document, error) {
 
 // Close releases the underlying MuPDF resources.
 func (d *Document) Close() {
-	d.doc.Close()
+	d.doc.Close() //nolint:errcheck // best-effort cleanup
 }
 
 var pngEncoder = png.Encoder{CompressionLevel: png.BestSpeed}

@@ -18,50 +18,51 @@ type workItem struct {
 	imageData []byte
 }
 
-// renderAndOCR renders all pages sequentially (MuPDF is not thread-safe),
+// renderAndOCR renders all pages parallel,
 // then fans out OCR+parse to a concurrent worker pool.
 func (p *Pipeline) renderAndOCR(
 	ctx context.Context,
 	pages []models.Page,
 	progress ProgressCallback,
 ) ([]models.ParsedPage, []string, int64) {
+	var (
+		processWG = &sync.WaitGroup{}
+		work      = make(chan workItem, p.cfg.Concurrency)
+	)
+
 	doc, openErr := pdf.OpenDocument(pages[0].SourcePath)
 	if openErr != nil {
 		return nil, []string{fmt.Sprintf("failed to open PDF: %v", openErr)}, 0
 	}
 
-	images := make([][]byte, len(pages))
-	for i, pg := range pages {
-		if ctx.Err() != nil {
-			doc.Close()
-			return nil, []string{"processing cancelled"}, 0
-		}
-		data, err := doc.RenderPage(pg.Number - 1)
-		if err != nil {
-			p.logger.Warn("render failed, continuing with empty image", "page", pg.Number, "err", err)
-		}
-		images[i] = data
-	}
-	doc.Close()
+	go func() {
+		defer doc.Close()
+		defer close(work)
 
-	// Phase 2: OCR + parse in parallel.
-	work := make(chan workItem, len(pages))
-	for i, pg := range pages {
-		work <- workItem{index: i, page: pg, imageData: images[i]}
-	}
-	close(work)
+		for i, pg := range pages {
+			if ctx.Err() != nil {
+				p.logger.Warn("processing cancelled")
+				return
+			}
+			data, err := doc.RenderPage(pg.Number - 1)
+			if err != nil {
+				p.logger.Warn("render failed, continuing with empty image", "page", pg.Number, "err", err)
+			}
+
+			work <- workItem{index: i, page: pg, imageData: data}
+		}
+	}()
 
 	results := make([]models.ParsedPage, len(pages))
 	var (
 		errsMu    sync.Mutex
 		errs      []string
-		wg        sync.WaitGroup
 		completed atomic.Int64
 		totalMs   atomic.Int64
 	)
 
 	for range p.cfg.Concurrency {
-		wg.Go(func() {
+		processWG.Go(func() {
 			for item := range work {
 				if ctx.Err() != nil {
 					return
@@ -80,18 +81,18 @@ func (p *Pipeline) renderAndOCR(
 					results[item.index] = parsed
 				}
 
-				done := int(completed.Add(1))
+				done := completed.Add(1)
 				progress(models.ProcessingProgress{
 					Stage:       "ocr",
 					Current:     done,
-					Total:       len(pages),
+					Total:       int64(len(pages)),
 					Description: fmt.Sprintf("Распознавание страницы %d из %d…", done, len(pages)),
 				})
 			}
 		})
 	}
 
-	wg.Wait()
+	processWG.Wait()
 	var avgMs int64
 	if n := int64(len(pages)); n > 0 {
 		avgMs = totalMs.Load() / n

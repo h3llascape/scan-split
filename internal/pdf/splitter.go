@@ -13,6 +13,6 @@ func PageCount(pdfPath string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to open %q: %w", pdfPath, err)
 	}
-	defer doc.Close()
+	defer doc.Close() //nolint:errcheck // best-effort cleanup
 	return doc.NumPage(), nil
 }

@@ -62,20 +62,16 @@ func TestNamesSimilar(t *testing.T) {
 
 // ── groupByStudent ────────────────────────────────────────────────────────────
 
-func page(n int, path string) models.Page {
-	return models.Page{Number: n, SourcePath: path}
-}
-
 func parsed(n int, name, group string) models.ParsedPage {
 	return models.ParsedPage{
-		Page:     page(n, "p"+string(rune('0'+n))+".pdf"),
+		Page:     models.Page{Number: n},
 		FullName: name,
 		Group:    group,
 	}
 }
 
 func parsedNoName(n int) models.ParsedPage {
-	return models.ParsedPage{Page: page(n, "p"+string(rune('0'+n))+".pdf")}
+	return models.ParsedPage{Page: models.Page{Number: n}}
 }
 
 // Cover-page heuristic: unnamed page immediately before a named page is treated
@@ -279,7 +275,7 @@ func TestGroupByStudent_GroupBackfill(t *testing.T) {
 	pages := []models.ParsedPage{
 		parsed(1, "Иванов Иван Иванович", ""), // no group on first page
 		{
-			Page:  page(2, "p2.pdf"),
+			Page:  models.Page{Number: 2},
 			Group: "РИ-330001", // group appears on second page
 		},
 	}

@@ -32,17 +32,17 @@ type OutputFile struct {
 
 // ProcessingResult is the final result returned after the pipeline completes.
 type ProcessingResult struct {
-	OutputFiles  []OutputFile // Successfully created student files
-	Orphans      []ParsedPage // Pages that could not be attributed to any student
-	Errors       []string     // Non-fatal errors collected during processing
-	AvgPageMs    int64        // Average render+OCR time per page in milliseconds
+	OutputFiles []OutputFile // Successfully created student files
+	Orphans     []ParsedPage // Pages that could not be attributed to any student
+	Errors      []string     // Non-fatal errors collected during processing
+	AvgPageMs   int64        // Average render+OCR time per page in milliseconds
 }
 
 // ProcessingProgress describes the current state of pipeline execution.
 // Emitted via Wails event "processing:progress".
 type ProcessingProgress struct {
 	Stage       string // "splitting" | "rendering" | "ocr" | "grouping" | "saving"
-	Current     int    // Current item index (1-based for display)
-	Total       int    // Total items in this stage
+	Current     int64  // Current item index (1-based for display)
+	Total       int64  // Total items in this stage
 	Description string // Human-readable description of the current step
 }

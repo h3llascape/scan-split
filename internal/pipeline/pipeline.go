@@ -97,8 +97,8 @@ func (p *Pipeline) Run(
 		return nil, fmt.Errorf("failed to create output dir %q: %w", outputDir, err)
 	}
 
-	total := len(students) + len(orphans)
-	saved := 0
+	total := int64(len(students) + len(orphans))
+	saved := int64(0)
 
 	for _, student := range students {
 		if ctx.Err() != nil {

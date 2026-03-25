@@ -1,0 +1,24 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gocritic
+    - prealloc
+
+linters-settings:
+  gocritic:
+    enabled-checks:
+      - appendAssign
+      - dupSubExpr
+      - sloppyLen
+      - unnecessaryBlock
+
+issues:
+  exclude-dirs:
+    - frontend
+    - build
