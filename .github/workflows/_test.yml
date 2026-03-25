@@ -1,0 +1,32 @@
+name: Test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Cache tessdata
+        id: cache-tessdata
+        uses: actions/cache@v4
+        with:
+          path: internal/ocr/tessdata
+          key: tessdata-rus-fast
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y --fix-missing tesseract-ocr libtesseract-dev libleptonica-dev
+
+      - name: Download tessdata
+        if: steps.cache-tessdata.outputs.cache-hit != 'true'
+        run: make tessdata
+
+      - name: Run tests
+        run: go test ./internal/... ./cmd/debug/...
