@@ -35,9 +35,10 @@ var pngEncoder = png.Encoder{CompressionLevel: png.BestSpeed}
 // Uses BestSpeed compression: ~2x faster encode than default, compact
 // output (~3MB vs ~12MB raw) — important because gosseract writes image
 // bytes to a temp file before OCR.
-// Resolution is 200 DPI — sufficient for printed text OCR.
+// Resolution is 300 DPI — higher than 200 DPI noticeably improves Tesseract
+// accuracy on scanned (as opposed to born-digital) PDFs.
 func (d *Document) RenderPage(pageIndex int) ([]byte, error) {
-	img, err := d.doc.ImageDPI(pageIndex, 200)
+	img, err := d.doc.ImageDPI(pageIndex, 300)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render page %d: %w", pageIndex, err)
 	}

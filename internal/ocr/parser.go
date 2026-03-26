@@ -8,9 +8,10 @@ import (
 
 // ParseResult holds student data extracted from OCR text.
 type ParseResult struct {
-	FullName   string  // "Иванов Иван Иванович"
-	Group      string  // "РИ-330942"
-	Confidence float64 // 0..1: 1.0 both found, 0.5 one found, 0.0 neither
+	FullName   string   // Best candidate: "Иванов Иван Иванович"
+	AllNames   []string // All name candidates found, ranked by priority
+	Group      string   // "РИ-330942"
+	Confidence float64  // 0..1: 1.0 both found, 0.5 one found, 0.0 neither
 }
 
 // groupRe matches group codes like "РИ-330942", "МО-230115", "ИКИТ-123456".
@@ -38,19 +39,25 @@ var nameStopWords = map[string]bool{
 
 // Parse extracts student info from raw OCR text.
 func Parse(text string) ParseResult {
-	name := extractName(text)
+	allNames := extractNames(text)
 	group := groupRe.FindString(text)
+
+	var fullName string
+	if len(allNames) > 0 {
+		fullName = allNames[0]
+	}
 
 	var confidence float64
 	switch {
-	case name != "" && group != "":
+	case fullName != "" && group != "":
 		confidence = 1.0
-	case name != "" || group != "":
+	case fullName != "" || group != "":
 		confidence = 0.5
 	}
 
 	return ParseResult{
-		FullName:   name,
+		FullName:   fullName,
+		AllNames:   allNames,
 		Group:      group,
 		Confidence: confidence,
 	}
@@ -59,56 +66,93 @@ func Parse(text string) ParseResult {
 // studentPrefixes — метки строк, за которыми следует ФИО студента.
 var studentPrefixes = []string{"Студент:", "Студентка:", "Студент", "Студентка"}
 
-// extractName looks for a student name in the text.
-// Priority:
-//  1. Lines starting with "Студент:" / "Студентка:" etc. — name is taken after the label.
-//     Accepts both full 3-word names and abbreviated forms (Фамилия И.О. / Фамилия И. О.).
-//  2. Fallback — three consecutive capitalized Cyrillic words not in the stop-word list.
-func extractName(text string) string {
+// extractNames collects all name candidates from the text, ranked by priority:
+//  1. Names after "Студент:" / "Студентка:" labels (highest confidence).
+//  2. All sequences of 3 consecutive capitalized Cyrillic words (full names).
+//  3. All "Surname + initials" patterns found anywhere in the text.
+//
+// Duplicates are removed. The first element is the best candidate (used as FullName).
+func extractNames(text string) []string {
+	seen := map[string]bool{}
+	var names []string
+	add := func(name string) {
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+
+	// Priority 1: labeled names after "Студент:" / "Студентка:" etc.
 	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		for _, prefix := range studentPrefixes {
-			if after, ok := strings.CutPrefix(line, prefix); ok {
-				candidate := strings.TrimSpace(after)
-				// Full 3-word name takes priority.
-				if isFullName(candidate) {
-					return candidate
+			after, ok := strings.CutPrefix(line, prefix)
+			if !ok {
+				continue
+			}
+			candidate := strings.TrimSpace(after)
+			if isFullName(candidate) {
+				add(candidate)
+				continue
+			}
+			if isAbbreviatedName(candidate) {
+				add(candidate)
+				continue
+			}
+			// OCR often appends noise after the name (e.g. "Котляров Н. А, Кол |").
+			// Try the first 3 words, then 2 words, stripping trailing garbage.
+			parts := strings.Fields(candidate)
+			for n := 3; n >= 2; n-- {
+				if n > len(parts) {
+					continue
 				}
-				// Accept abbreviated form: Фамилия + initials (e.g. "Котляров И.Н.").
-				// Only used when clearly labeled with "Студент:" to avoid false positives.
-				if isAbbreviatedName(candidate) {
-					return candidate
-				}
-				// OCR often appends noise after the name (e.g. "Котляров Н. А, Кол |").
-				// Try the first 3 words, then 2 words, stripping trailing garbage.
-				parts := strings.Fields(candidate)
-				for n := 3; n >= 2; n-- {
-					if n > len(parts) {
-						continue
-					}
-					if isAbbreviatedName(strings.Join(parts[:n], " ")) {
-						return strings.Join(parts[:n], " ")
-					}
+				sub := strings.Join(parts[:n], " ")
+				if isAbbreviatedName(sub) {
+					add(sub)
+					break
 				}
 			}
 		}
 	}
 
-	// Fallback: scan all words for three consecutive capitalized Cyrillic words
-	// that don't include known document-label stop words.
+	// Priority 2: all sequences of 3 consecutive capitalized Cyrillic words.
 	words := strings.Fields(text)
-	for i := range len(words) - 2 {
-		a, b, c := words[i], words[i+1], words[i+2]
-		if !isCyrillicTitle(a) || !isCyrillicTitle(b) || !isCyrillicTitle(c) {
-			continue
+	if len(words) >= 3 {
+		for i := range len(words) - 2 {
+			a, b, c := words[i], words[i+1], words[i+2]
+			if !isCyrillicTitle(a) || !isCyrillicTitle(b) || !isCyrillicTitle(c) {
+				continue
+			}
+			if nameStopWords[a] || nameStopWords[b] || nameStopWords[c] {
+				continue
+			}
+			add(a + " " + b + " " + c)
 		}
-		if nameStopWords[a] || nameStopWords[b] || nameStopWords[c] {
-			continue
-		}
-		return a + " " + b + " " + c
 	}
 
-	return ""
+	// Priority 3: all abbreviated names (Surname + initials) found anywhere.
+	// Surname must be ≥ 3 runes to avoid matching "Б.Н." patterns.
+	for i, w := range words {
+		if !isCyrillicTitle(w) || len([]rune(w)) < 3 || nameStopWords[w] {
+			continue
+		}
+		// Try 3-word form first (Surname И. О.), then 2-word (Surname И.О.).
+		if i+2 < len(words) {
+			candidate3 := w + " " + words[i+1] + " " + words[i+2]
+			if isAbbreviatedName(candidate3) {
+				add(candidate3)
+				continue // prefer longer form, skip 2-word check
+			}
+		}
+		if i+1 < len(words) {
+			candidate2 := w + " " + words[i+1]
+			if isAbbreviatedName(candidate2) {
+				add(candidate2)
+			}
+		}
+	}
+
+	return names
 }
 
 // isFullName returns true for exactly three space-separated Cyrillic title-case words.

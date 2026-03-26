@@ -112,6 +112,7 @@ func (p *Pipeline) processPage(ctx context.Context, page models.Page, imageData 
 	return models.ParsedPage{
 		Page:       page,
 		FullName:   res.FullName,
+		AllNames:   res.AllNames,
 		Group:      res.Group,
 		Confidence: res.Confidence,
 		IsOrphan:   res.Confidence == 0,

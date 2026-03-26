@@ -17,6 +17,9 @@ import (
 type Config struct {
 	// Concurrency is the number of parallel OCR workers. Defaults to 4.
 	Concurrency int
+	// Whitelist, if non-empty, restricts which OCR-detected names create
+	// student anchors. Names not matching any entry are treated as unnamed.
+	Whitelist []string
 }
 
 // ProgressCallback is invoked on each progress update from the pipeline.
@@ -39,6 +42,11 @@ func New(cfg Config, ocrProvider ocr.Provider, logger *slog.Logger) *Pipeline {
 		ocr:    ocrProvider,
 		logger: logger,
 	}
+}
+
+// SetWhitelist updates the student name whitelist for the next Run.
+func (p *Pipeline) SetWhitelist(names []string) {
+	p.cfg.Whitelist = names
 }
 
 // GroupPages exposes groupByStudent for the debug CLI.

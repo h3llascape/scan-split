@@ -76,6 +76,9 @@ func main() {
 
 		fmt.Printf("── Page %2d ─────────────────────────────────────────────\n", pg.Number)
 		fmt.Printf("  Name:       %q\n", res.FullName)
+		if len(res.AllNames) > 1 {
+			fmt.Printf("  AllNames:   %q\n", res.AllNames)
+		}
 		fmt.Printf("  Group:      %q\n", res.Group)
 		fmt.Printf("  Confidence: %.1f\n", res.Confidence)
 		fmt.Printf("  OCR text (first 400 chars):\n%s\n\n",

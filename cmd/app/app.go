@@ -119,7 +119,7 @@ func (a *App) SelectOutputDir() (string, error) {
 //   - "processing:progress" → models.ProcessingProgress
 //   - "processing:complete" → models.ProcessingResult
 //   - "processing:error"    → string
-func (a *App) ProcessFile(inputPath, outputDir string) error {
+func (a *App) ProcessFile(inputPath, outputDir string, whitelistRaw string) error {
 	a.mu.Lock()
 	if a.cancelFunc != nil {
 		a.cancelFunc()
@@ -127,6 +127,9 @@ func (a *App) ProcessFile(inputPath, outputDir string) error {
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.cancelFunc = cancel
 	a.mu.Unlock()
+
+	whitelist := parseWhitelist(whitelistRaw)
+	a.pipeline.SetWhitelist(whitelist)
 
 	go func() {
 		result, err := a.pipeline.Run(ctx, inputPath, outputDir, func(p models.ProcessingProgress) {
@@ -169,4 +172,16 @@ func (a *App) OpenResultsFolder(dir string) error {
 		return fmt.Errorf("failed to open folder %q: %w", dir, err)
 	}
 	return nil
+}
+
+// parseWhitelist splits raw textarea text into trimmed, non-empty lines.
+func parseWhitelist(raw string) []string {
+	var result []string
+	for line := range strings.SplitSeq(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
 }

@@ -5,10 +5,29 @@
 
   export let inputPath: string = "";
   export let outputDir: string = "";
+  export let whitelistText: string = "";
   export let onReady: () => void;
 
   let dragging = false;
   let dropError = "";
+  let whitelistOpen = false;
+
+  $: whitelistCount = whitelistText
+    .split("\n")
+    .map(s => s.trim())
+    .filter(s => s.length > 0).length;
+
+  function loadWhitelistFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      whitelistText = reader.result as string;
+    };
+    reader.readAsText(file);
+    input.value = "";
+  }
 
   async function pickFile() {
     const path = await SelectInputFile();
@@ -97,6 +116,35 @@
     </div>
   </div>
 
+  <div class="card">
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="section-toggle" on:click={() => whitelistOpen = !whitelistOpen}>
+      <span class="section-title">Список студентов</span>
+      <span class="toggle-hint">
+        {whitelistOpen ? '▾' : '▸'}
+        {whitelistCount > 0 ? `(${whitelistCount})` : '(необязательно)'}
+      </span>
+    </div>
+
+    {#if whitelistOpen}
+      <textarea
+        class="whitelist-textarea"
+        bind:value={whitelistText}
+        placeholder={"Иванов Иван Иванович\nПетрова Мария Сергеевна\n..."}
+        rows="8"
+      />
+      <div class="whitelist-actions">
+        <label class="btn btn-ghost btn-sm">
+          Загрузить из файла…
+          <input type="file" accept=".txt,.csv" hidden on:change={loadWhitelistFile} />
+        </label>
+        {#if whitelistCount > 0}
+          <span class="whitelist-count">{whitelistCount} имён</span>
+        {/if}
+      </div>
+    {/if}
+  </div>
+
   <div class="actions">
     <button class="btn btn-primary" disabled={!canProceed} on:click={onReady}>
       Начать обработку
@@ -156,6 +204,55 @@
     display: flex;
     gap: 10px;
     align-items: center;
+  }
+
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .whitelist-textarea {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .whitelist-textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  .whitelist-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .whitelist-count {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .btn-sm {
+    font-size: 12px;
+    padding: 4px 10px;
   }
 
   .actions {

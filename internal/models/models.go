@@ -10,10 +10,11 @@ type Page struct {
 // ParsedPage holds the OCR and parse results for a single page.
 type ParsedPage struct {
 	Page       Page
-	FullName   string  // Extracted full name, e.g. "Иванов Иван Иванович"
-	Group      string  // Extracted group code, e.g. "РИ-330942"
-	Confidence float64 // Parsing confidence in range 0..1
-	IsOrphan   bool    // True when name or group could not be extracted
+	FullName   string   // Best name candidate, e.g. "Иванов Иван Иванович"
+	AllNames   []string // All name candidates found, ranked by priority
+	Group      string   // Extracted group code, e.g. "РИ-330942"
+	Confidence float64  // Parsing confidence in range 0..1
+	IsOrphan   bool     // True when name or group could not be extracted
 }
 
 // Student represents a student with all their recognized pages.

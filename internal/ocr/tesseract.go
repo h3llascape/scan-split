@@ -67,6 +67,10 @@ func NewTesseractProvider(logger *slog.Logger, poolSize int) (*TesseractProvider
 			c.Close() //nolint:errcheck // best-effort cleanup
 			return nil, fmt.Errorf("tesseract init failed (language 'rus'): %w", err)
 		}
+		// oem 1 = LSTM neural-net engine (more accurate than legacy on scanned docs).
+		// psm 3 = automatic page segmentation without OSD (osd.traineddata not bundled).
+		c.SetVariable("tessedit_ocr_engine_mode", "1") //nolint:errcheck
+		c.SetVariable("tessedit_pageseg_mode", "3")    //nolint:errcheck
 		pool <- c
 	}
 

@@ -14,8 +14,8 @@ export function OpenResultsFolder(arg1) {
   return window['go']['app']['App']['OpenResultsFolder'](arg1);
 }
 
-export function ProcessFile(arg1, arg2) {
-  return window['go']['app']['App']['ProcessFile'](arg1, arg2);
+export function ProcessFile(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ProcessFile'](arg1, arg2, arg3);
 }
 
 export function SelectInputFile() {

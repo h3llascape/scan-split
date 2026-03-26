@@ -94,6 +94,7 @@ clean:
 
 GOLANGCI_LINT := bin/golangci-lint
 GOLANGCI_LINT_VERSION := v2.10.1
+MINIMOCK_VERSION := v3.4.7
 
 $(GOLANGCI_LINT):
 	GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
@@ -112,3 +113,11 @@ lint: $(GOLANGCI_LINT)
 
 .PHONY: check
 check: lint test
+
+.PHONY: install-minimock
+install-minimock:
+	GOBIN=$(CURDIR)/bin go install github.com/gojuno/minimock/v3/cmd/minimock@$(MINIMOCK_VERSION)
+
+.PHONY: go-gen
+go-gen: install-minimock
+	PATH=$(CURDIR)/bin:$$PATH go generate ./...

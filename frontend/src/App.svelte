@@ -18,13 +18,14 @@
   let error: string | null = null;
   let result: ProcessingResult | null = null;
   let ocrProvider = "";
+  let whitelistText = "";
 
   function startProcessing() {
     step = "processing";
     progress = null;
     error = null;
     result = null;
-    ProcessFile(inputPath, outputDir).catch((err: unknown) => {
+    ProcessFile(inputPath, outputDir, whitelistText).catch((err: unknown) => {
       error = err instanceof Error ? err.message : String(err);
     });
   }
@@ -36,6 +37,7 @@
     progress = null;
     error = null;
     result = null;
+    whitelistText = "";
   }
 
   onMount(() => {
@@ -91,6 +93,7 @@
       <FileUpload
         bind:inputPath
         bind:outputDir
+        bind:whitelistText
         onReady={startProcessing}
       />
     {:else if step === "processing"}

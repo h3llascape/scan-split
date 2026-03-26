@@ -7,7 +7,7 @@ export function GetOCRProvider():Promise<string>;
 
 export function OpenResultsFolder(arg1:string):Promise<void>;
 
-export function ProcessFile(arg1:string,arg2:string):Promise<void>;
+export function ProcessFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SelectInputFile():Promise<string>;
 

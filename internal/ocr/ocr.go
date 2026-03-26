@@ -1,3 +1,5 @@
+//go:generate minimock -i Provider -o ./mocks -s _mock.go
+
 // Package ocr defines the OCR provider interface and supporting types.
 package ocr
 
